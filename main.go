@@ -5,11 +5,31 @@ import (
 	"crypto/rand"
 	"encoding/base32"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/spf13/viper"
+)
+
+const (
+	BackendConsole   = "console"
+	BackendLocalFile = "localfile"
+	BackendS3File    = "s3file"
+
+	ConfigEnvVarPrefix = "UPLINK"
+
+	ConfigInstanceId     = "InstanceId"
+	ConfigEntriesPerFile = "EntriesPerFile"
+	ConfigSweepInterval  = "SweepInterval"
+	ConfigBackend        = "Backend"
+
+	ConfigS3Endpoint        = "S3Endpoint"
+	ConfigS3AccessKeyId     = "S3AccessKeyId"
+	ConfigS3SecretAccessKey = "S3SecretAccessKey"
+	ConfigS3UseSSL          = "S3UseSSL"
+	ConfigS3BucketName      = "S3BucketName"
+	ConfigS3Location        = "S3Location"
 )
 
 type Payload struct {
@@ -24,25 +44,44 @@ type AppConfig struct {
 	instanceId string
 }
 
+func setupConfig() {
+	viper.SetDefault(ConfigInstanceId, NewInstanceId())
+	viper.SetDefault(ConfigEntriesPerFile, 1000)
+	viper.SetDefault(ConfigSweepInterval, 60)
+	viper.SetDefault(ConfigBackend, BackendConsole)
+
+	viper.SetDefault(ConfigS3Endpoint, "localhost:9000")
+	viper.SetDefault(ConfigS3AccessKeyId, "")
+	viper.SetDefault(ConfigS3SecretAccessKey, "")
+	viper.SetDefault(ConfigS3UseSSL, false)
+	viper.SetDefault(ConfigS3BucketName, "uplink")
+	viper.SetDefault(ConfigS3Location, "us-east-1")
+
+	viper.SetEnvPrefix(ConfigEnvVarPrefix)
+	viper.AutomaticEnv()
+}
+
+func setupBackend() Backend {
+	switch viper.GetString(ConfigBackend) {
+	case BackendConsole:
+		return NewConsoleBackend()
+	case BackendLocalFile:
+		return NewLocalFileBackend()
+	case BackendS3File:
+		return NewS3FileBackend()
+	default:
+		return nil
+	}
+}
+
 func main() {
-	fmt.Println("Launching Uplink Server...")
-	// Initialise global state.
-	//backend = NewConsoleBackend()
-	//backend = NewLocalFileBackend(100, 3600)
-	backend = NewS3FileBackend(
-		100,
-		3600,
-		S3Config{
-			endpoint:        "127.0.0.1:9000",
-			accessKeyId:     "9087R1WSRBOF7TWA0KFO",
-			secretAccessKey: "JFbZaA6qTB3kdcdXln9X78Qqcby/jLa3xaAhNj8g",
-			useSSL:          false,
-			bucketName:      "uplink",
-			location:        "us-east-1",
-		},
-		AppConfig{
-			instanceId: NewInstanceId(),
-		})
+	log.Println("Launching Uplink Server...")
+
+	setupConfig()
+
+	log.Printf("Using Backend: %v\n", viper.GetString(ConfigBackend))
+
+	backend = setupBackend()
 
 	// Start background goroutines.
 	go backend.Run()
@@ -69,7 +108,7 @@ func ReceivePayload(w http.ResponseWriter, r *http.Request) {
 
 type Backend interface {
 	Run()
-	GetPayloadChannel()  chan<- *Payload
+	GetPayloadChannel() chan<- *Payload
 }
 
 func GenerateRandomBytes(n int) ([]byte, error) {

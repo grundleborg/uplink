@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/minio/minio-go"
+	"github.com/spf13/viper"
 )
 
 type S3FileBackend struct {
-	config    S3Config
-	appConfig AppConfig
+	instanceId string
 
 	entriesPerFile int
 	sweepInterval  int64
@@ -28,33 +28,27 @@ type S3FileBackend struct {
 	payloadStoreMap  map[string][]*Payload
 }
 
-type S3Config struct {
-	endpoint        string
-	accessKeyId     string
-	secretAccessKey string
-	useSSL          bool
-	bucketName      string
-	location        string
-}
-
-func NewS3FileBackend(entriesPerFile int, sweepInterval int64, config S3Config, appConfig AppConfig) Backend {
+func NewS3FileBackend() Backend {
 	return S3FileBackend{
-		config:           config,
-		appConfig:        appConfig,
+		instanceId:       viper.GetString(ConfigInstanceId),
 		schemaHeadersMap: make(map[string][]string),
 		payloadStoreMap:  make(map[string][]*Payload),
 		payloadChannel:   make(chan *Payload),
-		entriesPerFile:   entriesPerFile,
-		sweepInterval:    sweepInterval,
+		entriesPerFile:   viper.GetInt(ConfigEntriesPerFile),
+		sweepInterval:    viper.GetInt64(ConfigSweepInterval),
 	}
 }
 
 func (b S3FileBackend) Run() {
 	var err error
-	b.client, err = minio.New(b.config.endpoint, b.config.accessKeyId, b.config.secretAccessKey, b.config.useSSL)
+	b.client, err = minio.New(
+		viper.GetString(ConfigS3Endpoint),
+		viper.GetString(ConfigS3AccessKeyId),
+		viper.GetString(ConfigS3SecretAccessKey),
+		viper.GetBool(ConfigS3UseSSL))
 	checkError("cannot create minio client", err)
 
-	exists, err := b.client.BucketExists(b.config.bucketName)
+	exists, err := b.client.BucketExists(viper.GetString(ConfigS3BucketName))
 	checkError("failed to check if bucket exists", err)
 
 	if !exists {
@@ -153,7 +147,7 @@ func (b S3FileBackend) writeFileIfNecessary(schema string) {
 		return
 	}
 
-	fileName := fmt.Sprintf("%v-%v-%v.csv", schema, b.appConfig.instanceId, time.Now().Unix())
+	fileName := fmt.Sprintf("%v-%v-%v.csv", schema, b.instanceId, time.Now().Unix())
 
 	var buffer bytes.Buffer
 	bufferWriter := bufio.NewWriter(&buffer)
@@ -175,7 +169,7 @@ func (b S3FileBackend) writeFileIfNecessary(schema string) {
 	err := bufferWriter.Flush()
 	checkError("failed to flush buffer", err)
 
-	_, err = b.client.PutObject(b.config.bucketName, fileName, io.Reader(&buffer), int64(buffer.Len()), minio.PutObjectOptions{ContentType: "text/plain"})
+	_, err = b.client.PutObject(viper.GetString(ConfigS3BucketName), fileName, io.Reader(&buffer), int64(buffer.Len()), minio.PutObjectOptions{ContentType: "text/plain"})
 	checkError("failed to put object to S3", err)
 
 	b.ClearHeaders(schema)

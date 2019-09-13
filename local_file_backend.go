@@ -7,25 +7,27 @@ import (
 	"os"
 	"sort"
 	"time"
+
+	"github.com/spf13/viper"
 )
 
 type LocalFileBackend struct {
 	schemaHeadersMap map[string][]string
-	payloadStoreMap map[string][]*Payload
+	payloadStoreMap  map[string][]*Payload
 
 	payloadChannel chan *Payload
 
 	entriesPerFile int
-	sweepInterval int64
+	sweepInterval  int64
 }
 
-func NewLocalFileBackend(entriesPerFile int, sweepInterval int64) Backend {
+func NewLocalFileBackend() Backend {
 	return LocalFileBackend{
 		schemaHeadersMap: make(map[string][]string),
-		payloadStoreMap: make(map[string][]*Payload),
-		payloadChannel: make(chan *Payload),
-		entriesPerFile: entriesPerFile,
-		sweepInterval: sweepInterval,
+		payloadStoreMap:  make(map[string][]*Payload),
+		payloadChannel:   make(chan *Payload),
+		entriesPerFile:   viper.GetInt(ConfigEntriesPerFile),
+		sweepInterval:    viper.GetInt64(ConfigSweepInterval),
 	}
 }
 
