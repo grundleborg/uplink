@@ -75,10 +75,9 @@ func setupBackend() Backend {
 }
 
 func main() {
-	log.Println("Launching Uplink Server...")
-
 	setupConfig()
 
+	log.Printf("Launching Uplink Server with instance ID: %v\n", viper.GetString(ConfigInstanceId))
 	log.Printf("Using Backend: %v\n", viper.GetString(ConfigBackend))
 
 	backend = setupBackend()
