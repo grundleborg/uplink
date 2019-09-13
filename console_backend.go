@@ -8,16 +8,16 @@ import (
 )
 
 type ConsoleBackend struct {
-	schemaWriterMap map[string]*csv.Writer
+	schemaWriterMap  map[string]*csv.Writer
 	schemaHeadersMap map[string][]*string
-	payloadChannel chan *Payload
+	payloadChannel   chan *Payload
 }
 
 func NewConsoleBackend() Backend {
 	return ConsoleBackend{
-		schemaWriterMap: make(map[string]*csv.Writer),
+		schemaWriterMap:  make(map[string]*csv.Writer),
 		schemaHeadersMap: make(map[string][]*string),
-		payloadChannel: make(chan *Payload),
+		payloadChannel:   make(chan *Payload),
 	}
 }
 
