@@ -87,7 +87,7 @@ func main() {
 
 	// Start web server.
 	router := mux.NewRouter()
-	router.HandleFunc("/log", ReceivePayload).Methods("POST")
+	router.HandleFunc("/v0/log", ReceivePayload).Methods("POST")
 	log.Fatal(http.ListenAndServe(":8000", router))
 }
 

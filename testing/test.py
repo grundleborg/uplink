@@ -21,6 +21,6 @@ while True:
         }
     }
 
-    requests.post("http://localhost:8000/log", json=data)
+    requests.post("http://localhost:8000/v0/log", json=data)
 
 
