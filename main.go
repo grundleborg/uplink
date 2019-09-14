@@ -40,10 +40,6 @@ type Payload struct {
 
 var backend Backend
 
-type AppConfig struct {
-	instanceId string
-}
-
 func setupConfig() {
 	viper.SetDefault(ConfigInstanceId, NewInstanceId())
 	viper.SetDefault(ConfigEntriesPerFile, 1000)
@@ -108,17 +104,6 @@ func ReceivePayload(w http.ResponseWriter, r *http.Request) {
 type Backend interface {
 	Run()
 	GetPayloadChannel() chan<- *Payload
-}
-
-func GenerateRandomBytes(n int) ([]byte, error) {
-	b := make([]byte, n)
-	_, err := rand.Read(b)
-	// Note that err == nil only if we read len(b) bytes.
-	if err != nil {
-		return nil, err
-	}
-
-	return b, nil
 }
 
 var encoding = base32.NewEncoding("ybndrfg8ejkmcpqxot1uwisza345h769")
