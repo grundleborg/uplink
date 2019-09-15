@@ -127,7 +127,7 @@ func (b S3FileBackend) convertPayloadToStringList(payload *Payload) []string {
 	keys := b.GetHeaders(payload.Schema)
 
 	var stringList []string
-	stringList = append(stringList, payload.Source)
+	stringList = append(stringList, payload.Id, payload.Source, fmt.Sprintf("%v", payload.ServerTimestamp), fmt.Sprintf("%v", payload.ClientTimestamp))
 	for _, key := range keys {
 		data, ok := payload.Data[key]
 		if !ok {
@@ -156,7 +156,7 @@ func (b S3FileBackend) writeFileIfNecessary(schema string) {
 	writer.Comma = '|'
 
 	headers := b.GetHeaders(schema)
-	headers = append([]string{"source"}, headers...)
+	headers = append([]string{"id", "source", "server_timestamp", "client_timestamp"}, headers...)
 	writer.Write(headers)
 
 	for _, payload := range payloads {

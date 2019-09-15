@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 )
 
 type Client struct {
@@ -15,9 +16,10 @@ type Client struct {
 }
 
 type payload struct {
-	Source string                 `json:"source"`
-	Schema string                 `json:"schema"`
-	Data   map[string]interface{} `json:"data"`
+	Source          string                 `json:"source"`
+	Schema          string                 `json:"schema"`
+	ClientTimestamp int64                  `json:"client_timestamp"`
+	Data            map[string]interface{} `json:"data"`
 }
 
 // New creates a new instance of the Uplink Client, to connect to the specified server with the provided source key.
@@ -43,9 +45,10 @@ func (c *Client) Close() error {
 // Returns an error if this uplink client is already closed.
 func (c *Client) Track(schema string, data map[string]interface{}) error {
 	p := payload{
-		Source: c.key,
-		Schema: schema,
-		Data:   data,
+		Source:          c.key,
+		Schema:          schema,
+		ClientTimestamp: getMillis(),
+		Data:            data,
 	}
 
 	c.payloadChannel <- &p
@@ -71,4 +74,8 @@ func (c *Client) worker() {
 			httpClient.Post(c.server, "text/json", bytes.NewBuffer(b))
 		}
 	}
+}
+
+func getMillis() int64 {
+	return time.Now().UnixNano() / int64(time.Millisecond)
 }

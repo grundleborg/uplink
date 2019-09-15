@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
+	//"github.com/pborman/uuid"
 	"github.com/spf13/viper"
 )
 
@@ -33,9 +35,12 @@ const (
 )
 
 type Payload struct {
-	Source string                 `json:"source"`
-	Schema string                 `json:"schema"`
-	Data   map[string]interface{} `json:"data"`
+	Id              string                 `json:"id"`
+	Source          string                 `json:"source"`
+	Schema          string                 `json:"schema"`
+	ClientTimestamp int64                  `json:"client_timestamp"`
+	ServerTimestamp int64                  `json:"server_timestamp"`
+	Data            map[string]interface{} `json:"data"`
 }
 
 var backend Backend
@@ -97,6 +102,10 @@ func ReceivePayload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	payload.ServerTimestamp = GetMillis()
+	//payload.Id = uuid.NewRandom()
+	payload.Id = "12345"
+
 	channel := backend.GetPayloadChannel()
 	channel <- &payload
 }
@@ -118,4 +127,8 @@ func NewInstanceId() string {
 	encoder.Write(randomBytes)
 	encoder.Close()
 	return b.String()
+}
+
+func GetMillis() int64 {
+	return time.Now().UnixNano() / int64(time.Millisecond)
 }
