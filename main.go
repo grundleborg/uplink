@@ -5,12 +5,14 @@ import (
 	"crypto/rand"
 	"encoding/base32"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/gorilla/mux"
-	//"github.com/pborman/uuid"
+	"github.com/pborman/uuid"
 	"github.com/spf13/viper"
 )
 
@@ -103,11 +105,60 @@ func ReceivePayload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	payload.ServerTimestamp = GetMillis()
-	//payload.Id = uuid.NewRandom()
-	payload.Id = "12345"
+	payload.Id = uuid.NewRandom().String()
+
+	if validationResult := ValidatePayload(&payload); validationResult != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(*validationResult))
+		return
+	}
 
 	channel := backend.GetPayloadChannel()
 	channel <- &payload
+}
+
+func newString(s string) *string {
+	return &s
+}
+
+func ValidatePayload(payload *Payload) *string {
+	if payload.ClientTimestamp <= 0 {
+		return newString("client_timestamp field must be greater than 0")
+	}
+
+	if payload.Data == nil {
+		return newString("At least one data field must be provided in the payload")
+	}
+
+	for key, _ := range payload.Data {
+		if keyMsg := ValidateKey(key); keyMsg != nil {
+			return keyMsg
+		}
+	}
+
+	return nil
+}
+
+const keyRegexp = "^[a-z][0-9a-z_]*[a-z0-9]$"
+var validKey = regexp.MustCompile(keyRegexp)
+var forbiddenKeys = []string{"id", "server_timestamp", "client_timestamp", "source", "event"}
+
+func ValidateKey(key string) *string {
+	if !validKey.MatchString(key) {
+		return newString(fmt.Sprintf("Data key \"%v\" contains unacceptable characters. Key names must match the following regular expression: %v", key, keyRegexp))
+	}
+
+	for _, value := range forbiddenKeys {
+		if value == key {
+			return newString(fmt.Sprintf("Data key \"%v\" is a reserved word and must not be used", key))
+		}
+	}
+
+	if len(key) < 2 && len(key) > 128 {
+		return newString(fmt.Sprintf("Data key \"%v\" is too long. It must be less than 128 characters"))
+	}
+
+	return nil
 }
 
 type Backend interface {

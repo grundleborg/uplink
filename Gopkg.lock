@@ -20,6 +20,12 @@
   version = "v1.4.7"
 
 [[projects]]
+  name = "github.com/google/uuid"
+  packages = ["."]
+  revision = "0cd6bf5da1e1c83f8b45653022c74f71af0538a4"
+  version = "v1.1.1"
+
+[[projects]]
   name = "github.com/gorilla/context"
   packages = ["."]
   revision = "08b5f424b9271eedf6f9f0ce86cb9396ed337a42"
@@ -84,6 +90,12 @@
   packages = ["."]
   revision = "3536a929edddb9a5b34bd6861dc4a9647cb459fe"
   version = "v1.1.2"
+
+[[projects]]
+  name = "github.com/pborman/uuid"
+  packages = ["."]
+  revision = "adf5a7427709b9deb95d29d3fa8a2bf9cfd388f1"
+  version = "v1.2"
 
 [[projects]]
   name = "github.com/pelletier/go-toml"
@@ -210,6 +222,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "42ea039b68e0f3c724b5c49488d73bcdf999a6dd60f559f6285017627a982291"
+  inputs-digest = "3d86586b458ccf73c2fb6f822d80e159fba2498ae4cf970744cefd3771113bf5"
   solver-name = "gps-cdcl"
   solver-version = 1
