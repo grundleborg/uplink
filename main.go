@@ -38,6 +38,7 @@ const (
 
 type Payload struct {
 	Id              string                 `json:"id"`
+	Warehouse       string                 `json:"warehouse"`
 	Source          string                 `json:"source"`
 	Schema          string                 `json:"schema"`
 	ClientTimestamp int64                  `json:"client_timestamp"`
@@ -126,9 +127,25 @@ func newString(s string) *string {
 	return &s
 }
 
+const (
+	warehouseRegex = "^[a-z][0-9a-z]+$"
+	schemaRegex = "^[a-z][0-9a-z]+$"
+)
+
+var validWarehouse = regexp.MustCompile(warehouseRegex)
+var validSchema = regexp.MustCompile(schemaRegex)
+
 func ValidatePayload(payload *Payload) *string {
 	if payload.ClientTimestamp <= 0 {
 		return newString("client_timestamp field must be greater than 0")
+	}
+
+	if !validWarehouse.MatchString(payload.Warehouse) {
+		return newString(fmt.Sprintf("Warehouse \"%v\" contains unacceptable characters. Warehouse names must match the following regular expression: %v", payload.Warehouse, warehouseRegex))
+	}
+
+	if !validSchema.MatchString(payload.Schema) {
+		return newString(fmt.Sprintf("Schema \"%v\" contains unacceptable characters. Schema names must match the following regular expression: %v", payload.Schema, schemaRegex))
 	}
 
 	if payload.Data == nil {
