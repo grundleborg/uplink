@@ -91,7 +91,12 @@ func main() {
 	// Start web server.
 	router := mux.NewRouter()
 	router.HandleFunc("/v0/log", ReceivePayload).Methods("POST")
+	router.HandleFunc("/v0/log", PreflightResponder).Methods("OPTIONS")
 	log.Fatal(http.ListenAndServe(":8000", router))
+}
+
+func PreflightResponder(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 }
 
 func ReceivePayload(w http.ResponseWriter, r *http.Request) {
