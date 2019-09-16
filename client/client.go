@@ -9,13 +9,15 @@ import (
 )
 
 type Client struct {
-	key    string
-	server string
+	key       string
+	warehouse string
+	server    string
 
 	payloadChannel chan *payload
 }
 
 type payload struct {
+	Warehouse       string                 `json:"warehouse"`
 	Source          string                 `json:"source"`
 	Schema          string                 `json:"schema"`
 	ClientTimestamp int64                  `json:"client_timestamp"`
@@ -24,9 +26,10 @@ type payload struct {
 
 // New creates a new instance of the Uplink Client, to connect to the specified server with the provided source key.
 //  c := client.New("https://uplink.example.com/v0/log", "unique_identifier_for_this_server")
-func New(server string, key string) Client {
+func New(server string, warehouse string, key string) Client {
 	c := Client{
 		key:            key,
+		warehouse:      warehouse,
 		server:         server,
 		payloadChannel: make(chan *payload),
 	}
@@ -45,6 +48,7 @@ func (c *Client) Close() error {
 // Returns an error if this uplink client is already closed.
 func (c *Client) Track(schema string, data map[string]interface{}) error {
 	p := payload{
+		Warehouse:       c.warehouse,
 		Source:          c.key,
 		Schema:          schema,
 		ClientTimestamp: getMillis(),
