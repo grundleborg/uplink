@@ -116,6 +116,7 @@ func ReceivePayload(w http.ResponseWriter, r *http.Request) {
 	if validationResult := ValidatePayload(&payload); validationResult != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(*validationResult))
+		log.Println(*validationResult)
 		return
 	}
 
@@ -128,8 +129,8 @@ func newString(s string) *string {
 }
 
 const (
-	warehouseRegex = "^[a-z][0-9a-z]+$"
-	schemaRegex = "^[a-z][0-9a-z]+$"
+	warehouseRegex = "^[a-z][0-9a-z_]*[a-z0-9]$"
+	schemaRegex = "^[a-z][0-9a-z_]*[a-z0-9]$"
 )
 
 var validWarehouse = regexp.MustCompile(warehouseRegex)
