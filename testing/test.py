@@ -12,6 +12,8 @@ while True:
     data = {
         "source": str(uuid.uuid4()),
         "schema": "events",
+        "warehouse": "dev",
+        "client_timestamp": int(round(time.time() * 1000)),
         "data": {
             "event_key": ''.join(random.choices(['event_post_create', 'event_post_delete', 'event_post_flag', 'event_channel_change', 'event_rhs_close'])),
             "randum_string_id": ''.join(random.choices(string.ascii_lowercase + string.digits, k=26)),

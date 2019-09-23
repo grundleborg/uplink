@@ -24,15 +24,15 @@ type S3FileBackend struct {
 
 	payloadChannel chan *Payload
 
-	schemaHeadersMap map[string][]string
-	payloadStoreMap  map[string][]*Payload
+	schemaHeadersMap map[string]map[string][]string
+	payloadStoreMap  map[string]map[string][]*Payload
 }
 
 func NewS3FileBackend() Backend {
 	return S3FileBackend{
 		instanceId:       viper.GetString(ConfigInstanceId),
-		schemaHeadersMap: make(map[string][]string),
-		payloadStoreMap:  make(map[string][]*Payload),
+		schemaHeadersMap: make(map[string]map[string][]string),
+		payloadStoreMap:  make(map[string]map[string][]*Payload),
 		payloadChannel:   make(chan *Payload),
 		entriesPerFile:   viper.GetInt(ConfigEntriesPerFile),
 		sweepInterval:    viper.GetInt64(ConfigSweepInterval),
@@ -60,7 +60,7 @@ func (b S3FileBackend) Run() {
 		case payload := <-b.payloadChannel:
 			b.updateHeadersFromPayload(payload)
 			b.storePayload(payload)
-			b.writeFileIfNecessary(payload.Schema)
+			b.writeFileIfNecessary(payload.Warehouse, payload.Schema)
 		}
 	}
 }
@@ -69,23 +69,31 @@ func (b S3FileBackend) GetPayloadChannel() chan<- *Payload {
 	return b.payloadChannel
 }
 
-func (b S3FileBackend) GetHeaders(schema string) []string {
-	headers, ok := b.schemaHeadersMap[schema]
-	if ok {
+func (b S3FileBackend) GetHeaders(warehouse string, schema string) []string {
+	_, okWarehouse := b.schemaHeadersMap[warehouse]
+	if !okWarehouse {
+		b.schemaHeadersMap[warehouse] = make(map[string][]string)
+	}
+
+	headers, okSchema := b.schemaHeadersMap[warehouse][schema]
+	if okSchema {
 		return headers
 	}
 
 	headers = []string{}
-	b.schemaHeadersMap[schema] = headers
+	b.schemaHeadersMap[warehouse][schema] = headers
 	return headers
 }
 
-func (b S3FileBackend) ClearHeaders(schema string) {
-	delete(b.schemaHeadersMap, schema)
+func (b S3FileBackend) ClearHeaders(warehouse string, schema string) {
+	delete(b.schemaHeadersMap[warehouse], schema)
+	if len(b.schemaHeadersMap[warehouse]) == 0 {
+		delete(b.schemaHeadersMap, warehouse)
+	}
 }
 
-func (b S3FileBackend) SetHeaders(schema string, headers []string) {
-	b.schemaHeadersMap[schema] = headers
+func (b S3FileBackend) SetHeaders(warehouse string, schema string, headers []string) {
+	b.schemaHeadersMap[warehouse][schema] = headers
 }
 
 func (b S3FileBackend) updateHeadersFromPayload(payload *Payload) {
@@ -95,7 +103,7 @@ func (b S3FileBackend) updateHeadersFromPayload(payload *Payload) {
 	}
 	sort.Strings(keys)
 
-	oldKeys := b.GetHeaders(payload.Schema)
+	oldKeys := b.GetHeaders(payload.Warehouse, payload.Schema)
 
 	for _, newKey := range keys {
 		found := false
@@ -110,21 +118,26 @@ func (b S3FileBackend) updateHeadersFromPayload(payload *Payload) {
 		}
 	}
 
-	b.SetHeaders(payload.Schema, oldKeys)
+	b.SetHeaders(payload.Warehouse, payload.Schema, oldKeys)
 }
 
 func (b S3FileBackend) storePayload(payload *Payload) {
-	payloads, ok := b.payloadStoreMap[payload.Schema]
-	if !ok {
-		payloads = []*Payload{}
-		b.payloadStoreMap[payload.Schema] = payloads
+	_, okWarehouse := b.payloadStoreMap[payload.Warehouse]
+	if !okWarehouse {
+		b.payloadStoreMap[payload.Warehouse] = make(map[string][]*Payload)
 	}
+
+	payloads, okPayloads := b.payloadStoreMap[payload.Warehouse][payload.Schema]
+	if !okPayloads {
+		payloads = []*Payload{}
+	}
+
 	payloads = append(payloads, payload)
-	b.payloadStoreMap[payload.Schema] = payloads
+	b.payloadStoreMap[payload.Warehouse][payload.Schema] = payloads
 }
 
 func (b S3FileBackend) convertPayloadToStringList(payload *Payload) []string {
-	keys := b.GetHeaders(payload.Schema)
+	keys := b.GetHeaders(payload.Warehouse, payload.Schema)
 
 	var stringList []string
 	stringList = append(stringList, payload.Id, payload.Source, fmt.Sprintf("%v", payload.ServerTimestamp), fmt.Sprintf("%v", payload.ClientTimestamp))
@@ -138,16 +151,16 @@ func (b S3FileBackend) convertPayloadToStringList(payload *Payload) []string {
 	return stringList
 }
 
-func (b S3FileBackend) writeFileIfNecessary(schema string) {
-	payloads := b.payloadStoreMap[schema]
+func (b S3FileBackend) writeFileIfNecessary(warehouse string, schema string) {
+	payloads := b.payloadStoreMap[warehouse][schema]
 
-	log.Printf("Payloads Length for Schema: %v is: %v\n", schema, len(payloads))
+	log.Printf("Payloads Length for Warehouse: %v and Schema: %v is: %v\n", warehouse, schema, len(payloads))
 
 	if len(payloads) < b.entriesPerFile {
 		return
 	}
 
-	fileName := fmt.Sprintf("%v-%v-%v.csv", schema, b.instanceId, time.Now().Unix())
+	fileName := fmt.Sprintf("%v-%v-%v-%v.csv", warehouse, schema, b.instanceId, time.Now().Unix())
 
 	var buffer bytes.Buffer
 	bufferWriter := bufio.NewWriter(&buffer)
@@ -155,7 +168,7 @@ func (b S3FileBackend) writeFileIfNecessary(schema string) {
 	writer := csv.NewWriter(bufferWriter)
 	writer.Comma = '|'
 
-	headers := b.GetHeaders(schema)
+	headers := b.GetHeaders(warehouse, schema)
 	headers = append([]string{"id", "source", "server_timestamp", "client_timestamp"}, headers...)
 	writer.Write(headers)
 
@@ -172,6 +185,9 @@ func (b S3FileBackend) writeFileIfNecessary(schema string) {
 	_, err = b.client.PutObject(viper.GetString(ConfigS3BucketName), fileName, io.Reader(&buffer), int64(buffer.Len()), minio.PutObjectOptions{ContentType: "text/plain"})
 	checkError("failed to put object to S3", err)
 
-	b.ClearHeaders(schema)
-	delete(b.payloadStoreMap, schema)
+	b.ClearHeaders(warehouse, schema)
+	delete(b.payloadStoreMap[warehouse], schema)
+	if len(b.payloadStoreMap[warehouse]) == 0 {
+		delete(b.payloadStoreMap, warehouse)
+	}
 }
